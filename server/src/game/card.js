@@ -1,5 +1,5 @@
 import { CardTypes } from './constants';
-import GameException from './game-exception';
+import GameException from './exceptions/game-exception';
 
 class Card {
   constructor(type, suit = undefined, rank = undefined) {

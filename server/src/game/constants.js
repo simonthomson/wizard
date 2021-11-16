@@ -59,3 +59,5 @@ export const StandardPlayingCardRanks = [
   Ranks.King,
   Ranks.Ace
 ];
+
+export const SET_OF_ROUNDS_TO_PLAY_AUTOMATIC = null;
