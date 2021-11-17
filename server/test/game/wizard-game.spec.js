@@ -2,6 +2,7 @@ import WizardGame from '../../src/game/wizard-game';
 import {countInArray} from '../../../shared/js/util/util';
 import { CardTypes, Suits, Ranks } from '../../../shared/js/util/constants';
 import IllegalPlayException from '../../src/game/exceptions/illegal-play-exception';
+import GameException from '../../src/game/exceptions/game-exception';
 
 describe('WizardGame', () => {
 
@@ -40,6 +41,23 @@ describe('WizardGame', () => {
       let game = new WizardGame(players, numberOfWizards, numberOfJesters);
 
       expect(countInArray(game.getFullState().deck, card => card.type === CardTypes.Jester)).toEqual(numberOfJesters);
+    });
+
+    it('requires at least two players to make a game', () => {
+      let players = ['lonely-guy-1'];
+
+      expect(() => {
+        let game = new WizardGame(players);
+        expect(game).toBeUndefined();
+      }).toThrow(GameException);
+    });
+
+    it('fails to start a game if the players list contains duplicates', () => {
+      let players = ['cheeky-fella-1', 'unsuspecting-player-2', 'cheeky-fella-1', 'unsuspecting-player-4'];
+
+      expect(() => {
+        let game = new WizardGame(players);
+      }).toThrow(GameException);
     });
   });
 
@@ -103,8 +121,8 @@ describe('WizardGame', () => {
       let game = new WizardGame(players);
   
       game.deal();
-      game.makeBid(players[0], 0);
-      expect(game.getPublicState().trickBids[players[0]]).toEqual(0);
+      game.makeBid(players[1], 0);
+      expect(game.getPublicState().trickBids[players[1]]).toEqual(0);
     });
 
     it('records the bid to the scoreSheet', () => {
@@ -114,8 +132,8 @@ describe('WizardGame', () => {
   
       let round = 0;
       game.deal();
-      game.makeBid(players[0], 0);
-      expect(game.getPublicState().scoreSheet[players[0]][round].bid).toEqual(0);
+      game.makeBid(players[1], 0);
+      expect(game.getPublicState().scoreSheet[players[1]][round].bid).toEqual(0);
     });
 
     it('disallows a bid that would make the bids equal the tricks by the last player to bid', () => {
@@ -123,12 +141,11 @@ describe('WizardGame', () => {
   
       let game = new WizardGame(players);
   
-      let round = 0;
       game.deal();
-      game.makeBid(players[0], 1);
+      game.makeBid(players[1], 1);
 
-      expect(() => game.makeBid(players[1], 0)).toThrow(IllegalPlayException);
-      expect(game.getPublicState().trickBids[players[1]]).toEqual(null);
+      expect(() => game.makeBid(players[0], 0)).toThrow(IllegalPlayException);
+      expect(game.getPublicState().trickBids[players[0]]).toEqual(null);
     });
 
     it('disallows a bid that exceeds the number of tricks in the round', () => {
@@ -136,11 +153,10 @@ describe('WizardGame', () => {
   
       let game = new WizardGame(players, 4, 4, [3, 5]);
   
-      let round = 0;
       game.deal();
 
-      expect(() => game.makeBid(players[0], 4)).toThrow(IllegalPlayException);
-      expect(game.getPublicState().trickBids[players[0]]).toEqual(null);
+      expect(() => game.makeBid(players[1], 4)).toThrow(IllegalPlayException);
+      expect(game.getPublicState().trickBids[players[1]]).toEqual(null);
     });
 
     it('disallows a bid from a player who has already bid that round', () => {
@@ -148,12 +164,11 @@ describe('WizardGame', () => {
   
       let game = new WizardGame(players);
   
-      let round = 0;
       game.deal();
-      game.makeBid(players[0], 1);
+      game.makeBid(players[1], 1);
 
-      expect(() => game.makeBid(players[0], 0)).toThrow(IllegalPlayException);
-      expect(game.getPublicState().trickBids[players[0]]).toEqual(1);
+      expect(() => game.makeBid(players[1], 0)).toThrow(IllegalPlayException);
+      expect(game.getPublicState().trickBids[players[1]]).toEqual(1);
     });
 
     it('disallows a bid from a player whos turn it is not', () => {
@@ -161,12 +176,11 @@ describe('WizardGame', () => {
   
       let game = new WizardGame(players);
   
-      let round = 0;
       game.deal();
-      game.makeBid(players[0], 1);
+      game.makeBid(players[1], 1);
 
-      expect(() => game.makeBid(players[2], 1)).toThrow(IllegalPlayException);
-      expect(game.getPublicState().trickBids[players[2]]).toEqual(null);
+      expect(() => game.makeBid(players[0], 1)).toThrow(IllegalPlayException);
+      expect(game.getPublicState().trickBids[players[0]]).toEqual(null);
     });
   });
 
@@ -178,14 +192,14 @@ describe('WizardGame', () => {
 
       game.deal();
 
-      let cardInPlayer0Hand = game.getFullState().hands[players[0]][0];
+      let cardInPlayer1Hand = game.getFullState().hands[players[1]][0];
 
-      game.makeBid(players[0], 1);
       game.makeBid(players[1], 1);
+      game.makeBid(players[0], 1);
 
-      game.playCard(players[0], 0);
-      expect(game.getPublicState().inProgressTrick[players[0]]).toEqual(cardInPlayer0Hand);
-      expect(game.getFullState().hands[players[0]].length).toEqual(0);
+      game.playCard(players[1], 0);
+      expect(game.getPublicState().inProgressTrick[players[1]]).toEqual(cardInPlayer1Hand);
+      expect(game.getFullState().hands[players[1]].length).toEqual(0);
     });
 
     it('disallows playing out of turn', () => {
@@ -195,12 +209,10 @@ describe('WizardGame', () => {
 
       game.deal();
 
-      let cardInPlayer0Hand = game.getFullState().hands[players[0]][0];
-
-      game.makeBid(players[0], 1);
       game.makeBid(players[1], 1);
+      game.makeBid(players[0], 1);
 
-      expect(() => game.playCard(players[1], 0)).toThrow(IllegalPlayException);
+      expect(() => game.playCard(players[0], 0)).toThrow(IllegalPlayException);
     });
 
     it('disallows not following suit if not void in that suit', () => {
@@ -218,7 +230,7 @@ describe('WizardGame', () => {
       // manually put specific cards in players' hands
       for (let i = 0; i < players.length; i++) {
         let deckPositionToSwap = 0;
-        while (game.state.hands[players[i]][0].suit === game.state.hands[players[1]][1].suit) {
+        while (game.state.hands[players[i]][0].suit === game.state.hands[players[i]][1].suit) {
           if (deckPositionToSwap >= game.state.deck.length) {
             expect(deckPositionToSwap).toBeLessThan(game.state.deck.length);
           }
@@ -231,12 +243,12 @@ describe('WizardGame', () => {
       let positionOfHeartForPlayer0 = game.getFullState().hands[players[0]][0].suit === Suits.Hearts ? 0 : 1;
       let positionOfSpadeForPlayer1 = game.getFullState().hands[players[1]][0].suit === Suits.Spades ? 0 : 1;
 
-      game.makeBid(players[0], 0);
-      game.makeBid(players[1], 1);
+      game.makeBid(players[1], 0);
+      game.makeBid(players[0], 1);
 
-      game.playCard(players[0], positionOfHeartForPlayer0);
+      game.playCard(players[1], positionOfSpadeForPlayer1);
       
-      expect(() => game.playCard(players[1], positionOfSpadeForPlayer1)).toThrow(IllegalPlayException);
+      expect(() => game.playCard(players[0], positionOfHeartForPlayer0)).toThrow(IllegalPlayException);
     });
 
     it('gives the trick to the winner if this is the last card played in the trick.', () => {
@@ -251,14 +263,17 @@ describe('WizardGame', () => {
 
       game.deal();
 
-      game.makeBid(players[0], 2);
-      game.makeBid(players[1], 1);
+      game.makeBid(players[1], 2);
+      game.makeBid(players[0], 1);
 
-      game.playCard(players[0], 0);
       game.playCard(players[1], 0);
+      game.playCard(players[0], 0);
 
-      expect(game.getPublicState().wonTricks[players[0]].length).toEqual(1);
-      expect(game.inProgressTrick[players[0]]).toEqual(null);
+      expect(game.getPublicState().wonTricks[players[1]].length).toEqual(1);
+      expect(game.getPublicState().inProgressTrick[players[1]]).toEqual(null);
+
+      // expect that the winner of the last trick will lead the next one
+      expect(game.players[game.getPublicState().leadForInProgressTrickIndex]).toEqual(players[1]);
     });
   });
 
@@ -269,17 +284,143 @@ describe('WizardGame', () => {
       let game = new WizardGame(players);
 
       game.deal();
-      game.makeBid(players[0], 1);
       game.makeBid(players[1], 1);
+      game.makeBid(players[0], 1);
 
-      game.playCard(players[0], 0);
       game.playCard(players[1], 0);
+      game.playCard(players[0], 0);
 
       game.advanceToTheNextRound();
 
       expect(game.getPublicState().round).toEqual(1);
     });
 
+    it('fails to advance if the current round is not complete', () => {
+      let players = ['player-id-1', 'player-id-2'];
+  
+      let game = new WizardGame(players);
 
+      game.deal();
+
+      game.makeBid(players[1], 1);
+      game.makeBid(players[0], 1);
+
+      game.playCard(players[1], 0);
+
+      expect(() => game.advanceToTheNextRound()).toThrow(GameException);
+    });
+
+    it('fills in the scoreboard based on the results of the completed round', () => {
+      let players = ['player-id-1', 'player-id-2'];
+      let numberOfWizards = 0;
+      let numberOfJesters = 0;
+      let setOfRoundsToPlay = [2, 3];
+      let suits = [
+        Suits.Hearts,
+        Suits.Spades,
+        Suits.Diamonds,
+        Suits.Clubs,
+        Suits.Trees,
+        Suits.Crosses
+      ];
+      let ranks = [Ranks.Ace];
+
+      let game = new WizardGame(players, numberOfWizards, numberOfJesters, setOfRoundsToPlay, suits, ranks);
+
+      game.deal();
+
+      game.makeBid(players[1], 2);
+      game.makeBid(players[0], 1);
+
+      game.playCard(players[1], 0);
+      game.playCard(players[0], 0);
+
+      game.playCard(players[1], 0);
+      game.playCard(players[0], 0);
+
+      game.advanceToTheNextRound();
+
+      expect(game.getPublicState().scoreSheet[players[1]].bid).toEqual(2);
+      expect(game.getPublicState().scoreSheet[players[1]].pointsGained).toEqual(40);
+      expect(game.getPublicState().scoreSheet[players[0]].bid).toEqual(1);
+      expect(game.getPublicState().scoreSheet[players[0]].pointsGained).toEqual(-10);
+    });
+
+    it('clears the current round state so it is fresh for the new round', () => {
+      let players = ['player-id-1', 'player-id-2'];
+      let numberOfWizards = 0;
+      let numberOfJesters = 0;
+      let setOfRoundsToPlay = [2, 3];
+      let suits = [
+        Suits.Hearts,
+        Suits.Spades,
+        Suits.Diamonds,
+        Suits.Clubs,
+        Suits.Trees,
+        Suits.Crosses
+      ];
+      let ranks = [Ranks.Ace];
+
+      let game = new WizardGame(players, numberOfWizards, numberOfJesters, setOfRoundsToPlay, suits, ranks);
+
+      game.deal();
+
+      game.makeBid(players[1], 2);
+      game.makeBid(players[0], 1);
+
+      game.playCard(players[1], 0);
+      game.playCard(players[0], 0);
+
+      game.playCard(players[1], 0);
+      game.playCard(players[0], 0);
+
+      game.advanceToTheNextRound();
+
+      expect(game.getPublicState().trickBids[players[1]]).toEqual(null);
+      expect(game.getPublicState().trickBids[players[0]]).toEqual(null);
+      expect(game.getPublicState().wonTricks[players[1]].length).toEqual(0);
+      expect(game.getPublicState().wonTricks[players[0]].length).toEqual(0);
+
+      expect(game.getFullState().hands[players[1]].length).toEqual(0);
+      expect(game.getFullState().hands[players[0]].length).toEqual(0);
+      
+      expect(game.getFullState().cardShowingTrump).toEqual(null);
+      expect(game.getFullState().inProgressTrick[players[1]]).toEqual(null);
+      expect(game.getFullState().inProgressTrick[players[0]]).toEqual(null);
+    });
+
+    it('advances the dealer to the next player', () => {
+      let players = ['player-id-1', 'player-id-2'];
+      let numberOfWizards = 0;
+      let numberOfJesters = 0;
+      let setOfRoundsToPlay = [2, 3];
+      let suits = [
+        Suits.Hearts,
+        Suits.Spades,
+        Suits.Diamonds,
+        Suits.Clubs,
+        Suits.Trees,
+        Suits.Crosses
+      ];
+      let ranks = [Ranks.Ace];
+
+      let game = new WizardGame(players, numberOfWizards, numberOfJesters, setOfRoundsToPlay, suits, ranks);
+
+      game.deal();
+
+      game.makeBid(players[1], 2);
+      game.makeBid(players[0], 1);
+
+      game.playCard(players[1], 0);
+      game.playCard(players[0], 0);
+
+      game.playCard(players[1], 0);
+      game.playCard(players[0], 0);
+
+      game.advanceToTheNextRound();
+
+      expect(game.getPublicState().dealerIndex).toEqual(1);
+      expect(game.getPublicState().leadForInProgressTrickIndex).toEqual(0);
+    });
   });
 });

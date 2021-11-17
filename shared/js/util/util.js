@@ -28,3 +28,20 @@ export function shuffle(array) {
 
   return array;
 }
+
+// assumes the array contains strings. Does not work for arrays of objects currently.
+export function countUniqueElementsInArray(array) {
+  let elementsSeen = {};
+  const haveNotSeenYet = (element) => {
+    if (elementsSeen[element]) {
+      return false;
+    }
+    else {
+      elementsSeen[element] = true;
+      return true;
+    }
+  };
+
+  let uniqueEntryCount = countInArray(array, haveNotSeenYet);
+  return uniqueEntryCount;
+}
