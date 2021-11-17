@@ -57,7 +57,10 @@ export const CardTypes = {
   Jester: 'Jester',
 
   // Value, aka "Regular" card (e.g. 4 of clubs, king of diamonds, etc.)
-  Value: 'Value'
+  Value: 'Value',
+
+  // Special cards that I might implement for fun later
+  ArchWizard: 'ArchWizard'
 };
 
 export const StandardPlayingCardRanks = [

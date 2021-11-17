@@ -1,6 +1,6 @@
 import { shuffle } from '../../../shared/js/util/util';
 import Card from './card';
-import { Suits, Ranks, StandardPlayingCardRanks, CardTypes, SET_OF_ROUNDS_TO_PLAY_AUTOMATIC } from './constants';
+import { Suits, Ranks, StandardPlayingCardRanks, CardTypes, SET_OF_ROUNDS_TO_PLAY_AUTOMATIC } from '../../../shared/js/util/constants';
 import IllegalPlayException from './exceptions/illegal-play-exception';
 
 class WizardGame {
@@ -37,7 +37,7 @@ class WizardGame {
       scoreSheet: players.reduce((scoreSheetObj, player) => { let ret = { ...scoreSheetObj }; ret[player] = Array(this.totalRoundsThatWillBePlayed).fill({}); return ret; }, {}),
       cardShowingTrump: null,
       inProgressTrick: players.reduce((inProgressTrickObj, player) => { let ret = { ...inProgressTrickObj }; ret[player] = null; return ret; }, {}),
-      leadForInProgressTrick: players[0],
+      leadForInProgressTrickIndex: 0,
       wonTricks: players.reduce((wonTricksObj, player) => { let ret = { ...wonTricksObj }; ret[player] = []; return ret; }, {}),
       trickBids: players.reduce((trickBidsObj, player) => { let ret = { ...trickBidsObj }; ret[player] = null; return ret; }, {})
     };
@@ -54,8 +54,8 @@ class WizardGame {
       deck.push(new Card(CardTypes.Jester));
     }
 
-    for (let suit in suits) {
-      for (let rank in ranks) {
+    for (let suit of suits) {
+      for (let rank of ranks) {
         deck.push(new Card(CardTypes.Value, suit, rank));
       }
     }
@@ -74,7 +74,7 @@ class WizardGame {
       scoreSheet: this.state.scoreSheet,
       cardShowingTrump: this.state.cardShowingTrump,
       inProgressTrick: this.state.inProgressTrick,
-      leadForInProgressTrick: this.state.leadForInProgressTrick,
+      leadForInProgressTrickIndex: this.state.leadForInProgressTrickIndex,
       wonTricks: this.state.wonTricks,
       trickBids: this.state.trickBids
     };
@@ -124,6 +124,10 @@ class WizardGame {
         this.state.hands[player].push(this.state.deck.pop());
       }
     }
+
+    if (this.state.deck.length > 0) {
+      this.state.cardShowingTrump = this.state.deck.pop();
+    }
   }
 
   makeBid(player, bid) {
@@ -134,19 +138,11 @@ class WizardGame {
       throw new IllegalPlayException(`Player ${player} cannot place a bid of ${bid} because there are only ${this.setOfRoundsToPlay[this.getPublicState().round]} tricks in the round`);
     }
     
-    let playerWhoseTurnItIsToBid = this.getFullState().leadForInProgressTrick;
-    let playerIndex = 0;
-    while (this.players[playerIndex] !== playerWhoseTurnItIsToBid) {
-      playerIndex++;
-    }
+    let playerIndex = this.getFullState().leadForInProgressTrickIndex;
+    let playerWhoseTurnItIsToBid = this.players[playerIndex];
 
-    while (this.getFullState().trickBids[playerWhoseTurnItIsToBid]) {
-      if (playerIndex === this.players.length - 1) {
-        playerIndex = 0;
-      }
-      else {
-        playerIndex++; 
-      }
+    while (this.getFullState().trickBids[playerWhoseTurnItIsToBid] !== null) {
+      playerIndex = (playerIndex + 1) % this.players.length;
       playerWhoseTurnItIsToBid = this.players[playerIndex];
     }
 
@@ -169,6 +165,149 @@ class WizardGame {
 
     this.state.trickBids[player] = bid;
     this.state.scoreSheet[player][this.state.round].bid = bid;
+  }
+
+  _bidsComplete() {
+    for (let player of this.players) {
+      if (this.state.trickBids[player] === null) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  _leadSuit() {
+    if (!this.state.inProgressTrick[this.players[this.state.leadForInProgressTrickIndex]]) {
+      return null;
+    }
+    if (this.state.inProgressTrick[this.players[this.state.leadForInProgressTrickIndex]].suit) {
+      return this.state.inProgressTrick[this.players[this.state.leadForInProgressTrickIndex]].suit;
+    }
+    else if (this.state.inProgressTrick[this.players[this.state.leadForInProgressTrickIndex]].type === CardTypes.Jester) {
+      // the first non-jester makes lead
+      let playerIndex = this.state.leadForInProgressTrickIndex;
+      playerIndex = (playerIndex + 1) % this.players.length;
+      while (this.state.inProgressTrick[this.players[playerIndex]].type === CardTypes.Jester
+        && playerIndex !== this.state.leadForInProgressTrickIndex) {
+        playerIndex = (playerIndex + 1) % this.players.length;
+      }
+      if (this.state.inProgressTrick[this.players[playerIndex]].suit) {
+        return this.state.inProgressTrick[this.players[playerIndex]].suit;
+      }
+      else {
+        return null;
+      }
+    }
+    else {
+      return null;
+    }
+  }
+
+  _allCardsPlayedForThisTrick() {
+    for (let player of this.players) {
+      if (this.state.inProgressTrick[player] === null) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  _getPlayerCurrentlyWinningThisTrick() {
+    let leadSuit = this._leadSuit();
+    let trumpSuit = this.state.cardShowingTrump.suit || null;
+    let currentlyWinningCard = null;
+    const beatsCurrentlyWinningCard = (candidateCard) => {
+      if (candidateCard.suit && currentlyWinningCard && currentlyWinningCard.suit) {
+        if (candidateCard.suit === trumpSuit && currentlyWinningCard.suit !== trumpSuit) {
+          return true;
+        }
+        else if (candidateCard.suit === leadSuit && currentlyWinningCard.suit === leadSuit) {
+          if (this.ranks.indexOf(candidateCard.rank) > this.ranks.indexOf(currentlyWinningCard.rank)) {
+            return true;
+          }
+        }
+        else if (candidateCard.suit === trumpSuit && currentlyWinningCard.suit === trumpSuit) {
+          if (this.ranks.indexOf(candidateCard.rank) > this.ranks.indexOf(currentlyWinningCard.rank)) {
+            return true;
+          }
+        }
+        return false;
+      }
+      if (currentlyWinningCard.type === CardTypes.Wizard) {
+        return false;
+      }
+      if (currentlyWinningCard.type === CardTypes.Jester) {
+        if (candidateCard.type === CardTypes.Jester) {
+          return false;
+        }
+        else {
+          return true;
+        }
+      }
+      if (currentlyWinningCard.type === CardTypes.Value) {
+        if (candidateCard.type === CardTypes.Jester) {
+          return false;
+        }
+        if (candidateCard.type === CardTypes.Wizard) {
+          return true;
+        }
+      }
+    };
+    let numberOfPlayersChecked = 0;
+    let playerIndex = this.state.leadForInProgressTrickIndex;
+
+    let currentlyWinningPlayer = null;
+    while (numberOfPlayersChecked < this.players.length) {
+      if (beatsCurrentlyWinningCard(this.state.inProgressTrick[this.players[playerIndex]])) {
+        currentlyWinningCard = this.state.inProgressTrick[this.players[playerIndex]];
+        currentlyWinningPlayer = this.players[playerIndex];
+      }
+      playerIndex = (playerIndex + 1) % this.players.length;
+    }
+
+    return currentlyWinningPlayer;
+  }
+
+  playCard(player, cardIndex) {
+    if (this.state.inProgressTrick[player]) {
+      throw new IllegalPlayException(`Player ${player} cannot play a card because they have already played into this trick.`);
+    }
+
+    if (!this._bidsComplete()) {
+      throw new IllegalPlayException(`Player ${player} cannot play a card because there are still players who have yet to bid.`);
+    }
+
+    let playerIndex = this.state.leadForInProgressTrickIndex;
+    let playerWhoseTurnItIsToPlay = this.players[playerIndex];
+
+    while (this.state.inProgressTrick[playerWhoseTurnItIsToPlay] !== null) {
+      playerIndex = (playerIndex + 1) % this.players.length;
+      playerWhoseTurnItIsToPlay = this.players[playerIndex];
+    }
+
+    if (playerWhoseTurnItIsToPlay !== player) {
+      throw new IllegalPlayException(`Player ${player} cannot play a card because it is not their turn.`);
+    }
+
+    let leadSuit = this._leadSuit();
+    if (leadSuit && this.state.hands[player][cardIndex].suit
+      && leadSuit !== this.state.hands[player][cardIndex].suit) {
+        // the player is playing a suited card that does not match the suit led.
+        // This is only allowed if the player is void in the lead suit.
+        if (this.state.hands[player].some(card => card.suit === leadSuit)) {
+          throw new IllegalPlayException(`Player ${player} cannot play a card of suit ${this.state.hands[player][cardIndex].suit} because they have a card of suit ${leadSuit} in their hand, and ${leadSuit} was lead in this trick.`);
+        }
+    }
+
+    this.state.inProgressTrick[player] = this.state.hands[player][cardIndex];
+    this.state.hands[player].splice(cardIndex, 1);
+
+    if (this._allCardsPlayedForThisTrick()) {
+      // figure out the winner and give the trick to them
+      let winningPlayer = _getPlayerCurrentlyWinningThisTrick();
+
+      
+    }
   }
 }
 

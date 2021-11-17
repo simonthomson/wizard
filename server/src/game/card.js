@@ -1,4 +1,4 @@
-import { CardTypes } from './constants';
+import { CardTypes } from '../../../shared/js/util/constants';
 import GameException from './exceptions/game-exception';
 
 class Card {
